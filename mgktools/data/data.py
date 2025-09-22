@@ -46,7 +46,7 @@ class CachedDict:
         else:
             features = features_generator(mol)
             replace_token = 0
-            features = np.where(np.isnan(features), replace_token, features).tolist()
+            features = np.where((np.isnan(features)) | (features > 1e10), replace_token, features).tolist()
         return features
 
     def smiles2features(self, smiles: str, features_generator: FeaturesGenerator) -> List[float]: # 1D array.

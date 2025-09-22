@@ -12,7 +12,7 @@ class CacheArgs(Tap):
     """The Path of a list of CSV files."""
     smiles_columns: List[str] = None
     """Name of the columns containing single SMILES string."""
-    cache_graph: bool = True
+    cache_graph: bool = False
     """Convert SMILES into GraphDot graphs and cached."""
     features_generators_name: List[str] = None
     """Method(s) of generating additional features_mol."""
@@ -20,6 +20,7 @@ class CacheArgs(Tap):
     """The cpu numbers used for parallel computing."""
     cache_path: str = "cache.pkl"
     """The Path of the output cache file."""
+    
     @property
     def features_generators(self) -> Optional[List[FeaturesGenerator]]:
         if self.features_generators_name is None:

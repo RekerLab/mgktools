@@ -5,7 +5,8 @@ import math
 import numpy as np
 from collections import defaultdict
 from random import Random
-from rdkit import Chem
+from rdkit import Chem, DataStructs
+from rdkit.Chem import AllChem
 from rdkit.Chem.Scaffolds import MurckoScaffold
 from tqdm import tqdm
 from logging import Logger
@@ -37,7 +38,7 @@ def generate_scaffold(mol: Union[str, Chem.Mol],
 
 
 def scaffold_to_smiles(mols: Union[List[str], List[Chem.Mol]],
-                       use_indices: bool = False) -> Dict[str, Union[Set[str], Set[int]]]:
+                       use_indices: bool = False, similarity_threshold: float = None) -> Dict[str, Union[Set[str], Set[int]]]:
     """ Computes the scaffold for each SMILES and returns a mapping from scaffolds to sets of smiles (or indices).
 
     Parameters
@@ -46,6 +47,10 @@ def scaffold_to_smiles(mols: Union[List[str], List[Chem.Mol]],
     use_indices:
         Whether to map to the SMILES's index in :code:`mols` rather than mapping to the smiles string itself.
         This is necessary if there are duplicate smiles.
+    similarity_threshold: float, optional
+        If set, scaffolds that have a Tanimoto similarity greater than or equal to this threshold (based on their
+        Morgan fingerprints) will be grouped together. The keys of the returned dictionary will be a concatenation of the
+        scaffolds in each group, separated by semicolons.
 
     Returns
     -------
@@ -58,7 +63,53 @@ def scaffold_to_smiles(mols: Union[List[str], List[Chem.Mol]],
             scaffolds[scaffold].add(i)
         else:
             scaffolds[scaffold].add(mol)
-    return scaffolds
+    if similarity_threshold is not None:
+        scaffold_smiles_list = scaffolds.keys()
+        # 1. Generate Morgan fingerprints for all scaffolds
+        fingerprints = {}
+        for smiles in scaffold_smiles_list:
+            mol = Chem.MolFromSmiles(smiles)
+            if mol:
+                # Using parameters: radius=2, nBits=2048 (similar to ECFP4)
+                fp = AllChem.GetMorganFingerprintAsBitVect(mol, radius=2, nBits=2048)
+                fingerprints[smiles] = fp
+        # 2. Perform clustering (finding connected components)
+        clusters = []
+        unassigned_scaffolds = set(scaffold_smiles_list)
+
+        while unassigned_scaffolds:
+            # Start a new cluster with a random unassigned scaffold
+            seed_scaffold = unassigned_scaffolds.pop()
+            current_cluster = {seed_scaffold}
+
+            # Use a queue to find all connected scaffolds (breadth-first search)
+            queue = [seed_scaffold]
+            while queue:
+                current_scaffold = queue.pop(0)
+                # Find all scaffolds similar to the current one
+                similar_scaffolds = set()
+                for other_scaffold in unassigned_scaffolds:
+                    similarity = DataStructs.TanimotoSimilarity(
+                        fingerprints[current_scaffold], fingerprints[other_scaffold]
+                    )
+                    if similarity >= similarity_threshold:
+                        similar_scaffolds.add(other_scaffold)
+
+                # Add the new similar scaffolds to the cluster and the queue
+                current_cluster.update(similar_scaffolds)
+                queue.extend(list(similar_scaffolds))
+                unassigned_scaffolds.difference_update(similar_scaffolds)
+
+            clusters.append(sorted(list(current_cluster))) # Sort for consistent output
+        # 3. Merge scaffolds in the same cluster
+        merged_scaffolds = defaultdict(set)
+        for cluster in clusters:
+            key = ';'.join(cluster)  # Create a unique key for the cluster
+            for c in cluster:
+                merged_scaffolds[key].update(scaffolds[c])
+        return merged_scaffolds
+    else:
+        return scaffolds
 
 
 def get_split_sizes(n_samples: int,
@@ -79,13 +130,45 @@ def get_split_sizes(n_samples: int,
 def data_split_index(n_samples: int,
                      mols: List[Union[str, Chem.Mol]] = None,
                      targets: List = None,
-                     split_type: Literal['random', 'scaffold_order', 'scaffold_random', 'init_al', 'stratified',
-                                         'n_heavy'] = 'random',
+                     split_type: Literal['random', 'scaffold_order', 'scaffold_random',
+                                         'init_al', 'stratified', 'n_heavy'] = 'random',
                      sizes: List[float] = [0.8, 0.2],
                      n_samples_per_class: int = None,
                      n_heavy_cutoff: int = None,
+                     similarity_threshold: float = None,
                      seed: int = 0,
                      logger: Logger = None):
+    """ Split the data into different sets, return the indices of each set.
+    Parameters
+    ----------
+    n_samples: int
+        The number of samples in the dataset.
+    mols: List[Union[str, Chem.Mol]], optional
+        A list of SMILES strings or RDKit molecules.
+        Required if split_type is 'scaffold_random', 'scaffold_order', or 'n_heavy'.
+    targets: List, optional
+        A list of target values.
+        Required if split_type is 'stratified' or 'init_al'.
+    split_type: The algorithm used for data splitting.
+    sizes: [float, float].
+        sizes are the percentages of molecules in training and test sets.
+        If split_type == 'random', 'scaffold_random', 'scaffold_order', or 'stratified'.
+    n_samples_per_class: int, optional
+        If split_type == 'init_al'.
+        The number of samples per class in the initial training set.
+        If None, it will be set to int(sizes[0] * n_samples / num_class).
+    n_heavy_cutoff: int, optional
+        If split_type == 'n_heavy'.
+        training set contains molecules with heavy atoms < n_heavy.
+        test set contains molecules with heavy atoms >= n_heavy.
+    similarity_threshold: float, optional
+        If split_type is 'scaffold_random' or 'scaffold_order' and this is set, scaffolds that have a Tanimoto similarity
+        greater than or equal to this threshold (based on their Morgan fingerprints) will be grouped together.
+    seed: int
+        Random seed.
+    logger: Logger, optional
+        Logger for printing information and warnings.
+    """
     if logger is not None:
         info = logger.info
         warn = logger.warning
@@ -124,7 +207,7 @@ def data_split_index(n_samples: int,
         index_size = get_split_sizes(n_samples, split_ratio=sizes)
         if mols[0].__class__ == 'str':
             mols = [Chem.MolFromSmiles(s) for s in mols]
-        scaffold_to_indices = scaffold_to_smiles(mols, use_indices=True)
+        scaffold_to_indices = scaffold_to_smiles(mols, use_indices=True, similarity_threshold=similarity_threshold)
         index_sets = sorted(list(scaffold_to_indices.values()),
                             key=lambda index_set: len(index_set),
                             reverse=True)
