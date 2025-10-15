@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "mgktools"
 description = "Marginalized Graph Kernel Library for Molecular Property Prediction"
-version = "3.1.0"
+version = "3.2.0"
 authors = [
     {name = "Yan Xiang", email="yan.xiang@duke.edu"}
 ]
@@ -24,7 +24,7 @@ keywords = [
     "marginalized graph kernel",
     "drug discovery"
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     "rdkit==2023.9.6", # new version print annoying warnings
     "descriptastorus==2.6.1", # new version fail in pickle and multi-process acceleration
