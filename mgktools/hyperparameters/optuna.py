@@ -228,7 +228,7 @@ def bayesian_optimization(
     if n_to_run > 0:
         study.optimize(objective, n_trials=n_to_run)
     save_optimization_results(save_dir=save_dir, best_params=study.best_params, kernel_config=kernel_config)
-    optuna.delete_study(study_name="optuna-study", storage="sqlite:///%s/optuna.db" % save_dir)
+    # optuna.delete_study(study_name="optuna-study", storage="sqlite:///%s/optuna.db" % save_dir)
 
 
 def bayesian_optimization_gpr_multi_datasets(
