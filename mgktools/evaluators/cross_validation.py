@@ -167,8 +167,8 @@ class Evaluator:
         else:
             raise ValueError("Unsupported cross-validation method %s." % self.cross_validation)
 
-    def run_external(self, dataset_test: Dataset):
-        assert self.cross_validation == "no", "cross_validation must be 'no' for run_external()."
+    def run_external(self, dataset_test: Dataset, name='test_ext'):
+        # assert self.cross_validation == "no", "cross_validation must be 'no' for run_external()."
         if self.evaluate_train:
             df_predict, df_metrics = self.evaluate_train_test(self.dataset, self.dataset)
             df_predict.to_csv("%s/train_prediction.csv" % self.save_dir, index=False)
@@ -178,10 +178,10 @@ class Evaluator:
                 self.log("Training set performance:")
                 self.log_metrics(df_metrics)
         df_predict, df_metrics = self.evaluate_train_test(self.dataset, dataset_test)
-        df_predict.to_csv("%s/test_ext_prediction.csv" % self.save_dir, index=False)
+        df_predict.to_csv("%s/%s_prediction.csv" % (self.save_dir, name), index=False)
         if df_metrics is not None:
             # Calculate metrics values.
-            df_metrics.to_csv("%s/test_ext_metrics.csv" % self.save_dir, index=False)
+            df_metrics.to_csv("%s/%s_metrics.csv" % (self.save_dir, name), index=False)
             self.log("External test set performance:")
             self.log_metrics(df_metrics)
         if self.atomic_attribution:
@@ -196,6 +196,7 @@ class Evaluator:
                                    "contribution_percentage": c_percentage[i][idx],
                                    "contribution_value": c_y[i][idx]})
                 df.to_csv("%s/molecular_attribution_mol%d.csv" % (self.save_dir, i), index=False)
+        return df_metrics['value'].mean()
 
     def eval_loocv(self) -> float:
         df_predict, df_metrics = self.evaluate_train_test(self.dataset, self.dataset)

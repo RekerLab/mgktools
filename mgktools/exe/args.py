@@ -207,8 +207,8 @@ class TrainArgs(KernelArgs, ModelArgs):
         if self.ensemble:
             assert self.n_samples_per_model is not None
 
-        if self.separate_test_path is not None:
-            assert self.cross_validation == "no", "cross-validation should be set to no when separate_test_path is provided."
+        # if self.separate_test_path is not None:
+        #     assert self.cross_validation == "no", "cross-validation should be set to no when separate_test_path is provided."
 
         if self.atomic_attribution or self.molecular_attribution:
             assert self.cross_validation == "no", "cross-validation should be set to no for interpretability."
@@ -254,6 +254,8 @@ class OptunaArgs(TrainArgs):
     """The step size of C to be optimized."""
     num_splits: int = 1
     """split the dataset randomly into no. subsets to reduce computational costs."""
+    separate_val_path: str = None
+    """Path to separate validation set, optional."""
 
     def process_args(self) -> None:
         super().process_args()

@@ -202,6 +202,43 @@ def mgk_optuna(arguments=None):
         print(f"**\tLoading cache file: {args.cache_path}.\t**")
         dataset.set_cache(CachedDict.load(filename=args.cache_path))
     dataset.unify_datatype()
+
+    if args.separate_val_path is not None:
+        df_val = pd.read_csv(args.separate_val_path)
+        dataset_val = Dataset.from_df(
+            df=df_val,
+            smiles_columns=args.smiles_columns,
+            features_columns=args.features_columns,
+            targets_columns=args.targets_columns,
+            n_jobs=args.n_jobs,
+        )
+        dataset_val.set_status(graph_kernel_type=args.graph_kernel_type,
+                               features_generators=args.features_generators, 
+                               features_combination=args.features_combination)
+        if args.cache_path is not None:
+            dataset_val.set_cache(CachedDict.load(filename=args.cache_path))
+        dataset.unify_datatype(dataset_val.X_graph)
+    else:
+        dataset_val = None
+
+    if args.separate_test_path is not None:
+        df_test = pd.read_csv(args.separate_test_path)
+        dataset_test = Dataset.from_df(
+            df=df_test,
+            smiles_columns=args.smiles_columns,
+            features_columns=args.features_columns,
+            targets_columns=args.targets_columns,
+            n_jobs=args.n_jobs,
+        )
+        dataset_test.set_status(graph_kernel_type=args.graph_kernel_type,
+                                features_generators=args.features_generators, 
+                                features_combination=args.features_combination)
+        if args.cache_path is not None:
+            dataset_test.set_cache(CachedDict.load(filename=args.cache_path))
+        dataset.unify_datatype(dataset_test.X_graph)
+    else:
+        dataset_test = None
+
     if args.num_splits == 1:
         datasets = [dataset]
     else:
@@ -220,6 +257,8 @@ def mgk_optuna(arguments=None):
     optuna_bayesian_optimization(
         save_dir=args.save_dir,
         datasets=datasets,
+        dataset_val=dataset_val,
+        dataset_test=dataset_test,
         kernel_config=kernel_config,
         task_type=args.task_type,
         model_type=args.model_type,

@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 from typing import Dict, List, Union, Literal, Tuple
 import numpy as np
+import copy
 import optuna
 from optuna.samplers import TPESampler
 from mgktools.data.data import Dataset
@@ -11,19 +12,27 @@ from mgktools.kernels.PreComputed import calc_precomputed_kernel_config
 from mgktools.kernels.base import BaseKernelConfig
 
 
-def evaluate_model(dataset, kernel_config, model_type, task_type, metric, **kwargs):
+def evaluate_model(dataset, dataset_val, dataset_test, kernel_config, model_type, task_type, metric, **kwargs):
     """Evaluate model performance for a single dataset."""
     alpha = kwargs.pop('alpha', 0.01)
     C = kwargs.pop('C', 10)
     
     if dataset.graph_kernel_type == "graph":
-        kernel = calc_precomputed_kernel_config(kernel_config, dataset).kernel
+        dataset_full = copy.copy(dataset)
         dataset.graph_kernel_type = "pre-computed"
+        if dataset_val is not None:
+            dataset_full.data = dataset_full.data + dataset_val.data
+            dataset_val.graph_kernel_type = "pre-computed"
+        if dataset_test is not None:
+            dataset_full.data = dataset_full.data + dataset_test.data
+            dataset_test.graph_kernel_type = "pre-computed"
+        assert dataset_full.graph_kernel_type == "graph"
+        kernel = calc_precomputed_kernel_config(kernel_config, dataset_full).kernel
         tag = True
     else:
         kernel = kernel_config.kernel
         tag = False
-        
+
     model = set_model(model_type=model_type, kernel=kernel, alpha=alpha, C=C)
     evaluator = Evaluator(
         dataset=dataset,
@@ -33,11 +42,26 @@ def evaluate_model(dataset, kernel_config, model_type, task_type, metric, **kwar
         verbose=False,
         **kwargs
     )
-    score = evaluator.run_cross_validation()
+    if dataset_test is not None:
+        evaluator.run_external(dataset_test, name='test')
+        
+    if dataset_val is not None:
+        score = evaluator.run_external(dataset_val, name='val')
+    else:
+        score = evaluator.run_cross_validation()
     
     if tag:
         dataset.graph_kernel_type = "graph"
+        if dataset_val is not None:
+            dataset_val.graph_kernel_type = "graph"
+        if dataset_test is not None:
+            dataset_test.graph_kernel_type = "graph"
+        
     dataset.clear_cookie()
+    if dataset_val is not None:
+        dataset_val.clear_cookie()
+    if dataset_test is not None:
+        dataset_test.clear_cookie()
     
     return score
 
@@ -57,6 +81,8 @@ def save_optimization_results(save_dir: str, best_params: Dict, kernel_config) -
 def bayesian_optimization(
     save_dir: str,
     datasets: List[Dataset],
+    dataset_val: Dataset,
+    dataset_test: Dataset,
     kernel_config: BaseKernelConfig,
     task_type: Literal["regression", "binary", "multi-class"],
     model_type: Literal["gpr", "gpr-sod", "gpr-nystrom", "gpr-nle", "svr", "gpc", "svc"],
@@ -194,14 +220,16 @@ def bayesian_optimization(
             return np.mean(scores)
         else:
             scores = []
-            for dataset in datasets:
+            for i, dataset in enumerate(datasets):
                 score = evaluate_model(
                     dataset=dataset,
+                    dataset_val=dataset_val,
+                    dataset_test=dataset_test,
                     kernel_config=kernel_config,
                     model_type=model_type,
                     task_type=task_type,
                     metric=metric,
-                    save_dir=save_dir,
+                    save_dir='%s/%d-%d' % (save_dir, trial.number, i),
                     cross_validation=cross_validation,
                     n_splits=n_splits,
                     split_type=split_type,
@@ -227,7 +255,7 @@ def bayesian_optimization(
     n_to_run = num_iters - len(study.trials)
     if n_to_run > 0:
         study.optimize(objective, n_trials=n_to_run)
-    save_optimization_results(save_dir=save_dir, best_params=study.best_params, kernel_config=kernel_config)
+    # save_optimization_results(save_dir=save_dir, best_params=study.best_params, kernel_config=kernel_config)
     # optuna.delete_study(study_name="optuna-study", storage="sqlite:///%s/optuna.db" % save_dir)
 
 
