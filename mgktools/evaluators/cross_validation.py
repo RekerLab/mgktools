@@ -170,14 +170,14 @@ class Evaluator:
     def run_external(self, dataset_test: Dataset, name='test_ext'):
         # assert self.cross_validation == "no", "cross_validation must be 'no' for run_external()."
         if self.evaluate_train:
-            df_predict, df_metrics = self.evaluate_train_test(self.dataset, self.dataset)
+            df_predict, df_metrics = self.evaluate_train_test(self.dataset, self.dataset, loocv=False)
             df_predict.to_csv("%s/train_prediction.csv" % self.save_dir, index=False)
             if df_metrics is not None:
                 # Calculate metrics values.
                 df_metrics.to_csv("%s/train_metrics.csv" % self.save_dir, index=False)
                 self.log("Training set performance:")
                 self.log_metrics(df_metrics)
-        df_predict, df_metrics = self.evaluate_train_test(self.dataset, dataset_test)
+        df_predict, df_metrics = self.evaluate_train_test(self.dataset, dataset_test, loocv=False)
         df_predict.to_csv("%s/%s_prediction.csv" % (self.save_dir, name), index=False)
         if df_metrics is not None:
             # Calculate metrics values.
@@ -208,12 +208,12 @@ class Evaluator:
         return df_metrics['value'].mean()
 
     def evaluate_train_test(self, dataset_train: Dataset,
-                            dataset_test: Dataset) -> Tuple[pd.DataFrame, pd.DataFrame]:
+                            dataset_test: Dataset, loocv=True) -> Tuple[pd.DataFrame, pd.DataFrame]:
         test_targets_known = (dataset_train.N_tasks == dataset_test.N_tasks)
         pred_dict = {"repr": dataset_test.repr}
         y_preds = []
         for i in range(dataset_train.N_tasks):
-            if self.cross_validation == "leave-one-out":
+            if self.cross_validation == "leave-one-out" and loocv:
                 y_pred, y_std = self.model.predict_loocv(dataset_test.X, dataset_test.y[:, i], return_std=True)
             else:
                 self.fit(dataset_train.X, dataset_train.y[:, i])

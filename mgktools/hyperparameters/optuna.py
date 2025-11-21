@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from typing import Dict, List, Union, Literal, Tuple
+import os
 import numpy as np
 import copy
 import optuna
@@ -42,12 +43,25 @@ def evaluate_model(dataset, dataset_val, dataset_test, kernel_config, model_type
         verbose=False,
         **kwargs
     )
-    if dataset_test is not None:
-        evaluator.run_external(dataset_test, name='test')
-        
+
     if dataset_val is not None:
+        if dataset_test is not None:
+            dataset_train_val = copy.copy(dataset)
+            dataset_train_val.data = dataset_train_val.data + dataset_val.data
+            evaluator1 = Evaluator(
+                dataset=dataset_train_val,
+                model=model,
+                task_type=task_type,
+                metrics=[metric],
+                verbose=False,
+                **kwargs
+            )
+            evaluator1.run_external(dataset_test, name='test')
+            evaluator.run_external(dataset_val, name='test_train_only')
         score = evaluator.run_external(dataset_val, name='val')
     else:
+        if dataset_test is not None:
+            evaluator.run_external(dataset_test, name='test')
         score = evaluator.run_cross_validation()
     
     if tag:
@@ -179,6 +193,9 @@ def bayesian_optimization(
         assert split_sizes is not None
 
     def objective(trial) -> Union[float, np.ndarray]:
+        save_dir_trial = '%s/trial-%d' % (save_dir, trial.number)
+        os.makedirs(save_dir_trial, exist_ok=True)
+
         hyperdict = kernel_config.get_trial(trial)
 
         # Handle alpha parameter
@@ -209,6 +226,7 @@ def bayesian_optimization(
         curr_C = hyperdict.pop("C", C)
         kernel_config.update_from_trial(hyperdict)
         kernel_config.update_kernel()
+        kernel_config.save(path='%s/trial-%d' % (save_dir, trial.number))
         if metric == "log_likelihood":
             assert model_type in ["gpr", "gpr-sod", "gpr-nystrom", "gpr-nle"], "Log likelihood only supported for GPR models"
             kernel = kernel_config.kernel
@@ -221,6 +239,8 @@ def bayesian_optimization(
         else:
             scores = []
             for i, dataset in enumerate(datasets):
+                if i != 0:
+                    save_dir_trial = '%s/trial-%d/subset-%d' % (save_dir, trial.number, i)
                 score = evaluate_model(
                     dataset=dataset,
                     dataset_val=dataset_val,
@@ -229,7 +249,7 @@ def bayesian_optimization(
                     model_type=model_type,
                     task_type=task_type,
                     metric=metric,
-                    save_dir='%s/%d-%d' % (save_dir, trial.number, i),
+                    save_dir=save_dir_trial,
                     cross_validation=cross_validation,
                     n_splits=n_splits,
                     split_type=split_type,
@@ -255,7 +275,7 @@ def bayesian_optimization(
     n_to_run = num_iters - len(study.trials)
     if n_to_run > 0:
         study.optimize(objective, n_trials=n_to_run)
-    # save_optimization_results(save_dir=save_dir, best_params=study.best_params, kernel_config=kernel_config)
+    save_optimization_results(save_dir=save_dir, best_params=study.best_params, kernel_config=kernel_config)
     # optuna.delete_study(study_name="optuna-study", storage="sqlite:///%s/optuna.db" % save_dir)
 
 
