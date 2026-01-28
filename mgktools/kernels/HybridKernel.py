@@ -109,7 +109,7 @@ class HybridKernel:
             self.kernel_list[i].diag(X_list[i]) for i in range(len(self.kernel_list))
         ]
         if self.hybrid_rule == "product":
-            return np.product(diag_list, axis=0)
+            return np.prod(diag_list, axis=0)
         else:
             raise Exception("Unknown hybrid rule %s" % self.hybrid_rule)
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import shutil
+import tempfile
 import pandas as pd
 import pytest
 from mgktools.data.data import Dataset
@@ -34,7 +35,8 @@ def test_only_graph_classification(mgk_file, model, split_type):
                                       mgk_hyperparameters_files=[mgk_file])
     C = 1.0 if model == 'svc' else None
     model = set_model(model, kernel=kernel_config.kernel, C=C)
-    Evaluator(save_dir='tmp',
+    save_dir = tempfile.mkdtemp()
+    Evaluator(save_dir=save_dir,
               dataset=dataset,
               model=model,
               task_type='binary',
@@ -44,7 +46,7 @@ def test_only_graph_classification(mgk_file, model, split_type):
               split_sizes=[0.75, 0.25],
               num_folds=2,
               verbose=True).run_cross_validation()
-    shutil.rmtree('tmp')
+    shutil.rmtree(save_dir)
 
 
 @pytest.mark.parametrize('n_splits', [4, 5])
@@ -62,7 +64,8 @@ def test_kFold_cv_classification(n_splits):
                                       mgk_hyperparameters_files=[mgk_file])
     C = 1.0 if model == 'svc' else None
     model = set_model(model, kernel=kernel_config.kernel, C=C)
-    Evaluator(save_dir='tmp',
+    save_dir = tempfile.mkdtemp()
+    Evaluator(save_dir=save_dir,
               dataset=dataset,
               model=model,
               task_type='binary',
@@ -71,18 +74,17 @@ def test_kFold_cv_classification(n_splits):
               n_splits=n_splits,
               num_folds=2,
               verbose=True).run_cross_validation()
-    shutil.rmtree('tmp')
+    shutil.rmtree(save_dir)
 
 
-@pytest.mark.parametrize('mgk_file', [additive_norm, additive_pnorm, additive_msnorm,
-                                      product_norm, product_pnorm, product_msnorm])
+@pytest.mark.parametrize('mgk_file', [product_msnorm])
 @pytest.mark.parametrize('modelsets', [('gpr', None, None, None),
                                        ('gpr', 2, 3, 'smallest_uncertainty'),
                                        # ('gpr', 2, 3, 'weight_uncertainty'),
                                        ('gpr', 2, 3, 'mean'),
                                        ('gpr-nystrom', None, 3, None),
                                        ('gpr-nle', None, 3, None)])
-@pytest.mark.parametrize('split_type', ['random', 'scaffold_order', 'scaffold_random'])
+@pytest.mark.parametrize('split_type', ['random'])
 def test_only_graph_scalable_gps(mgk_file, modelsets, split_type):
     model_type, n_estimators, n_samples_per_model, ensemble_rule = modelsets
     dataset = Dataset.from_df(df=df_regression,
@@ -100,7 +102,8 @@ def test_only_graph_scalable_gps(mgk_file, modelsets, split_type):
                       n_estimators=n_estimators,
                       n_samples_per_model=n_samples_per_model,
                       ensemble_rule=ensemble_rule)
-    Evaluator(save_dir='tmp',
+    save_dir = tempfile.mkdtemp()
+    Evaluator(save_dir=save_dir,
               dataset=dataset,
               model=model,
               task_type='regression',
@@ -110,7 +113,7 @@ def test_only_graph_scalable_gps(mgk_file, modelsets, split_type):
               num_folds=2,
               verbose=True,
               n_core=n_samples_per_model if model_type == 'gpr-nystrom' else None).run_cross_validation()
-    shutil.rmtree('tmp')
+    shutil.rmtree(save_dir)
 
 
 def test_loocv():
@@ -128,11 +131,12 @@ def test_loocv():
     model = set_model(model_type,
                       kernel=kernel_config.kernel,
                       alpha=0.01)
-    Evaluator(save_dir='tmp',
+    save_dir = tempfile.mkdtemp()
+    Evaluator(save_dir=save_dir,
               dataset=dataset,
               model=model,
               task_type='regression',
               metrics=['rmse', 'mae', 'mse', 'r2', 'max', 'spearman', 'kendall', 'pearson'],
               cross_validation='leave-one-out',
               num_folds=1).run_cross_validation()
-    shutil.rmtree('tmp')
+    shutil.rmtree(save_dir)

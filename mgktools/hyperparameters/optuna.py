@@ -356,6 +356,8 @@ def bayesian_optimization_gpr_multi_datasets(
         for i, dataset in enumerate(datasets):
             score = evaluate_model(
                 dataset=dataset,
+                dataset_val=None,
+                dataset_test=None,
                 kernel_config=kernel_config,
                 model_type='gpr',
                 task_type=tasks_type[i],

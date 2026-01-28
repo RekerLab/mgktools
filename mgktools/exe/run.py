@@ -360,7 +360,7 @@ def mgk_embedding(arguments=None):
         embedding = TSNE(
             n_components=args.n_components,
             perplexity=args.perplexity,
-            n_iter=args.n_iter,
+            max_iter=args.n_iter,
             n_jobs=args.n_jobs,
         ).fit_transform(D)
     elif args.embedding_algorithm == "kPCA":

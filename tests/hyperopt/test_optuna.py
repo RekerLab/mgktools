@@ -47,6 +47,8 @@ def test_bayesian_Graph(mgk_file, split_set):
     bayesian_optimization(
         save_dir=save_dir,
         datasets=[dataset],
+        dataset_val=None,
+        dataset_test=None,
         kernel_config=kernel_config,
         model_type='gpr',
         task_type='regression',
@@ -60,13 +62,15 @@ def test_bayesian_Graph(mgk_file, split_set):
         alpha=0.01,
         alpha_bounds=(0.001, 0.02),
         d_alpha=0.001)
-    for file in ['optuna.db', 'graph_hyperparameters.json', 'results.log']:
+    for file in ['optuna.db', 'graph_hyperparameters.json']:
         assert os.path.exists(f'{save_dir}/{file}')
         os.remove(f'{save_dir}/{file}')
 
     bayesian_optimization(
         save_dir=save_dir,
         datasets=[dataset, dataset],
+        dataset_val=None,
+        dataset_test=None,
         kernel_config=kernel_config,
         model_type='gpr',
         task_type='regression',
@@ -80,13 +84,15 @@ def test_bayesian_Graph(mgk_file, split_set):
         alpha=0.01,
         alpha_bounds=(0.001, 0.02),
         d_alpha=0.001)
-    for file in ['optuna.db', 'graph_hyperparameters.json', 'results.log']:
+    for file in ['optuna.db', 'graph_hyperparameters.json']:
         assert os.path.exists(f'{save_dir}/{file}')
         os.remove(f'{save_dir}/{file}')
 
     bayesian_optimization(
         save_dir=save_dir,
         datasets=[dataset],
+        dataset_val=None,
+        dataset_test=None,
         kernel_config=kernel_config,
         model_type='gpr',
         task_type='regression',
@@ -127,6 +133,8 @@ def test_bayesian_Fingperprint(features_kernel_type, features_generators, split_
     bayesian_optimization(
         save_dir=save_dir,
         datasets=[dataset],
+        dataset_val=None,
+        dataset_test=None,
         kernel_config=kernel_config,
         model_type='gpr',
         task_type='regression',

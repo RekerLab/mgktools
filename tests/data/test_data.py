@@ -23,7 +23,7 @@ df = pd.DataFrame({'smiles_1': smiles_1, 'smiles_2': smiles_2, 'targets_1': targ
     (['morgan_count'], 'concat', 2048),
     (['rdkit_2d'], 'concat', 200),
     (['rdkit_2d_normalized'], 'concat', 200),
-    (['rdkit_208'], 'concat', 210),
+    (['rdkit_208'], 'concat', 217),
     (['rdkit_topol'], 'concat', 2048),
     (['layered'], 'concat', 2048),
     (['torsion'], 'concat', 2048),

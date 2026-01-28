@@ -101,8 +101,8 @@ class EnsembleRegressor:
     def majority_vote(self, y, u, rule):
         if rule == 'smallest_uncertainty':
             idx = u.argmin(axis=0)
-            return np.array([y[idx[I]][I] for I in np.lib.index_tricks.ndindex(idx.shape)]), \
-                   np.array([u[idx[I]][I] for I in np.lib.index_tricks.ndindex(idx.shape)])
+            return np.array([y[idx[I]][I] for I in np.ndindex(idx.shape)]), \
+                   np.array([u[idx[I]][I] for I in np.ndindex(idx.shape)])
         elif rule == 'weight_uncertainty':
             sigma = 10
             weight = np.exp(-sigma*u) / np.exp(-sigma*u).sum(axis=0)

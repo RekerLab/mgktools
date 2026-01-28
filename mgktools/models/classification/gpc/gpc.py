@@ -10,7 +10,7 @@ from sklearn.gaussian_process._gpc import (
 from sklearn.multiclass import (
     LabelBinarizer, warnings, _ConstantPredictor, Parallel, delayed
 )
-from sklearn.utils.validation import _deprecate_positional_args
+from sklearn.utils.validation import _deprecate_positional_args, validate_data
 import numpy as np
 import copy
 
@@ -244,11 +244,11 @@ class GPC_MGK(_GPC):
         self : returns an instance of self.
         """
         if self.kernel is None or self.kernel.requires_vector_input:
-            X, y = self._validate_data(X, y, multi_output=False,
-                                       ensure_2d=True, dtype="numeric")
+            X, y = validate_data(self, X, y, multi_output=False,
+                                 ensure_2d=True, dtype="numeric")
         else:
-            X, y = self._validate_data(X, y, multi_output=False,
-                                       ensure_2d=False, dtype=None)
+            X, y = validate_data(self, X, y, multi_output=False,
+                                 ensure_2d=False, dtype=None)
 
         self.base_estimator_ = BinaryGaussianProcessClassifierLaplace(
             kernel=self.kernel,

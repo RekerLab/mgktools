@@ -67,11 +67,12 @@ def scaffold_to_smiles(mols: Union[List[str], List[Chem.Mol]],
         scaffold_smiles_list = scaffolds.keys()
         # 1. Generate Morgan fingerprints for all scaffolds
         fingerprints = {}
+        morgan_generator = AllChem.GetMorganGenerator(radius=2, fpSize=2048)
         for smiles in scaffold_smiles_list:
             mol = Chem.MolFromSmiles(smiles)
             if mol:
-                # Using parameters: radius=2, nBits=2048 (similar to ECFP4)
-                fp = AllChem.GetMorganFingerprintAsBitVect(mol, radius=2, nBits=2048)
+                # Using parameters: radius=2, fpSize=2048 (similar to ECFP4)
+                fp = morgan_generator.GetFingerprint(mol)
                 fingerprints[smiles] = fp
         # 2. Perform clustering (finding connected components)
         clusters = []

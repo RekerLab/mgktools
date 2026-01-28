@@ -1,5 +1,21 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+"""
+Base kernel classes and microkernel components.
+
+This module provides the foundational classes for building complex kernels
+from smaller microkernel components. It supports hyperparameter optimization
+through both Hyperopt and Optuna frameworks.
+
+Classes
+-------
+MicroKernel
+    Smallest unit of a kernel with a single hyperparameter.
+ABCKernelConfig
+    Abstract base class for kernel configurations.
+BaseKernelConfig
+    Base configuration class for sklearn-compatible kernels.
+"""
 from abc import ABC, abstractmethod
 from typing import Tuple, List, Dict, Callable, Any
 import os
@@ -19,12 +35,67 @@ from graphdot.microkernel import (
 from graphdot.microprobability import (
     Additive as Additive_p,
     Constant,
-    UniformProbability,
     AssignProbability,
 )
 
 
 class MicroKernel:
+    """
+    Smallest unit of a kernel containing a single hyperparameter.
+
+    MicroKernels are the building blocks for constructing complex graph kernels.
+    Each microkernel wraps a specific kernel function type (e.g., RBF, Kronecker Delta,
+    Square Exponential) with its associated hyperparameter and optimization bounds.
+
+    Parameters
+    ----------
+    idx : int
+        Index of the kernel configuration this microkernel belongs to.
+        Used to create unique names when the same microkernel type appears
+        in different kernel configs.
+    name : str
+        Name of the microkernel (e.g., 'atom_Gasteiger_charge').
+    kernel_type : str
+        Type of kernel function. Supported types:
+        - 'rbf': Radial Basis Function kernel
+        - 'dot_product': Dot product kernel
+        - 'Const': Constant microkernel
+        - 'kDelta': Kronecker Delta microkernel
+        - 'kConv': Convolution microkernel
+        - 'sExp': Square Exponential microkernel
+        - 'Const_p': Constant microprobability
+        - 'Assign_p': Assignment probability
+        - 'Normalization': Kernel normalization
+        - 'a_type', 'b_type', 'p_type': Atom/bond/probability composition types
+    value : float or str
+        Hyperparameter value or composition type name.
+    bounds : Tuple[float, float], optional
+        Lower and upper bounds for hyperparameter optimization.
+        Use 'fixed' for non-optimizable parameters, by default None.
+    delta : float, optional
+        Step size for discrete hyperparameter optimization, by default None.
+    available_values : List, optional
+        List of categorical values for hyperparameter selection, by default None.
+
+    Attributes
+    ----------
+    unique_name : str
+        Unique identifier combining idx, name, and kernel_type.
+
+    Raises
+    ------
+    AssertionError
+        If bounds and available_values are both None or both set,
+        or if bounds are invalid.
+
+    Examples
+    --------
+    >>> mk = MicroKernel(idx=0, name='length_scale', kernel_type='sExp',
+    ...                  value=1.0, bounds=(0.1, 10.0))
+    >>> kernel = mk.get_kernel()
+    >>> space = mk.get_space()  # For hyperparameter optimization
+    """
+
     def __init__(
         self,
         idx: int,
@@ -35,25 +106,6 @@ class MicroKernel:
         delta: float = None,
         available_values: List = None,
     ):
-        """The smallest unit to build a complex kernel. Each microkernel contains only one hyperparameter.
-
-        Parameters
-        ----------
-        idx : int
-            The index of the kernel config this microkernel belongs to. This is important to separate the same microkernel in different kernel configs.
-        name : str
-            The name of the microkernel.
-        kernel_type : str
-            The function type of the microkernel.
-        value :
-            The hyperparameter of the microkernel.
-        bounds : Tuple[float, float], optional
-            A tuple with the lower and upper bounds for the hyperparameters optimization, by default None ("fixed").
-        delta : float, optional
-            The stepsize for the hyperparameters optimization, by default None.
-        available_values : List, optional
-            A list with the available values for the hyperparameters optimization, by default None.
-        """
         self.name = name
         self.kernel_type = kernel_type
         self.unique_name = f"{idx}:{name}:{kernel_type}"
@@ -78,6 +130,19 @@ class MicroKernel:
                 assert isinstance(self.value, float)
 
     def get_kernel(self) -> Callable:
+        """
+        Create and return the kernel function with current hyperparameters.
+
+        Returns
+        -------
+        Callable
+            Kernel function instance with configured hyperparameters.
+
+        Raises
+        ------
+        ValueError
+            If kernel_type is not supported.
+        """
         bounds = self.bounds or "fixed"
         if self.kernel_type == "rbf":
             return RBF(length_scale=self.value, length_scale_bounds=bounds)
@@ -91,8 +156,6 @@ class MicroKernel:
             return kConv(kDelta(self.value, bounds))
         elif self.kernel_type == "sExp":
             return sExp(self.value, length_scale_bounds=bounds)
-        elif self.kernel_type == "Uniform_p":
-            return UniformProbability(self.value, bounds)
         elif self.kernel_type == "Const_p":
             return Constant(self.value, bounds)
         elif self.kernel_type == "Assign_p":
@@ -125,6 +188,15 @@ class MicroKernel:
             raise ValueError("Invalid kernel type %s." % self.kernel_type)
 
     def get_space(self) -> Dict:
+        """
+        Get the Hyperopt search space for this microkernel.
+
+        Returns
+        -------
+        Dict
+            Dictionary mapping unique_name to Hyperopt distribution.
+            Empty dict if parameter is fixed.
+        """
         if self.available_values is not None:
             return {
                 self.unique_name: hp.choice(self.unique_name, self.available_values)
@@ -149,6 +221,14 @@ class MicroKernel:
                 }
 
     def update_from_space(self, space: Dict[str, Any]):
+        """
+        Update hyperparameter value from Hyperopt search space result.
+
+        Parameters
+        ----------
+        space : Dict[str, Any]
+            Dictionary of sampled hyperparameter values.
+        """
         if self.unique_name in space:
             assert self.bounds != "fixed"
             self.value = space[self.unique_name]
@@ -156,6 +236,20 @@ class MicroKernel:
             assert self.bounds == "fixed", f"{self.unique_name};{self.bounds};{space}"
 
     def get_trial(self, trial) -> Dict:
+        """
+        Get Optuna trial suggestions for this microkernel.
+
+        Parameters
+        ----------
+        trial : optuna.Trial
+            Optuna trial object for suggesting hyperparameters.
+
+        Returns
+        -------
+        Dict
+            Dictionary mapping unique_name to suggested value.
+            Empty dict if parameter is fixed.
+        """
         if self.available_values is not None:
             return {
                 self.unique_name: trial.suggest_categorical(
@@ -182,9 +276,26 @@ class MicroKernel:
                 }
 
     def update_from_trial(self, trial: Dict[str, Any]):
+        """
+        Update hyperparameter value from Optuna trial result.
+
+        Parameters
+        ----------
+        trial : Dict[str, Any]
+            Dictionary of trial hyperparameter values.
+        """
         self.update_from_space(trial)
 
     def update_from_theta(self, values: List):
+        """
+        Update hyperparameter value from gradient optimization theta.
+
+        Parameters
+        ----------
+        values : List
+            List of hyperparameter values. The first value is popped
+            and assigned to this microkernel.
+        """
         assert self.available_values is None
         if self.bounds != "fixed":
             assert self.bounds[0] * 0.99 < values[0] < self.bounds[1] * 1.01
@@ -195,10 +306,27 @@ class MicroKernel:
             self.value = values.pop(0)
 
     def get_microdict(self) -> Dict:
+        """
+        Get dictionary representation of microkernel configuration.
+
+        Returns
+        -------
+        Dict
+            Dictionary with kernel_type as key and [value, bounds, delta,
+            available_values] as value.
+        """
         values = [self.value, self.bounds, self.delta, self.available_values]
         return {f"{self.kernel_type}": values}
 
     def update_hyperdict(self, hyperdict: Dict):
+        """
+        Update a hyperparameter dictionary with this microkernel's configuration.
+
+        Parameters
+        ----------
+        hyperdict : Dict
+            Dictionary to update with microkernel configuration.
+        """
         if self.name == self.kernel_type:
             assert self.kernel_type not in hyperdict
             hyperdict.update(self.get_microdict())
@@ -209,7 +337,24 @@ class MicroKernel:
             hyperdict[self.name].update(self.get_microdict())
 
     @classmethod
-    def from_microdict(cls, idx: int, name: str, microdict: Dict[str, List]):
+    def from_microdict(cls, idx: int, name: str, microdict: Dict[str, List]) -> 'MicroKernel':
+        """
+        Create a MicroKernel from a dictionary representation.
+
+        Parameters
+        ----------
+        idx : int
+            Index for unique naming.
+        name : str
+            Name of the microkernel.
+        microdict : Dict[str, List]
+            Dictionary with kernel_type as key and configuration list as value.
+
+        Returns
+        -------
+        MicroKernel
+            New MicroKernel instance.
+        """
         assert len(microdict) == 1
         for kernel_type, values in microdict.items():
             return cls(
@@ -224,38 +369,74 @@ class MicroKernel:
 
 
 class ABCKernelConfig(ABC):
+    """
+    Abstract base class for kernel configurations.
+
+    This class defines the interface that all kernel configurations must
+    implement to support hyperparameter optimization via Hyperopt, Optuna,
+    and gradient-based methods.
+    """
+
     @abstractmethod
     def update_kernel(self):
+        """Update the kernel with current hyperparameter values."""
         pass
 
     @abstractmethod
     def get_space(self) -> Dict:
+        """Get Hyperopt search space for all hyperparameters."""
         pass
 
     @abstractmethod
     def update_from_space(self, space: Dict[str, Any]):
+        """Update hyperparameters from Hyperopt search space result."""
         pass
-    
+
     @abstractmethod
     def get_trial(self, trial) -> Dict:
+        """Get Optuna trial suggestions for all hyperparameters."""
         pass
 
     @abstractmethod
     def update_from_trial(self, trial: Dict[str, Any]):
+        """Update hyperparameters from Optuna trial result."""
         pass
 
     @abstractmethod
     def update_from_theta(self):
+        """Update hyperparameters from gradient optimization theta."""
         pass
 
 
 class BaseKernelConfig(ABCKernelConfig):
+    """
+    Base configuration class for sklearn-compatible kernels.
+
+    This class provides common functionality for configuring feature-based
+    kernels (RBF, DotProduct) that work with sklearn's GaussianProcessRegressor.
+
+    Parameters
+    ----------
+    kernel_type : str
+        Type of kernel ('rbf' or 'dot_product').
+    kernel_hyperparameters : list
+        List of hyperparameter values.
+    kernel_hyperparameters_bounds : list
+        List of (lower, upper) bound tuples for each hyperparameter.
+
+    Attributes
+    ----------
+    kernel : sklearn kernel
+        The configured sklearn kernel instance.
+    """
+
     def __init__(
         self,
         kernel_type: str,
         kernel_hyperparameters: list,
         kernel_hyperparameters_bounds: list,
     ):
+        """Initialize base kernel configuration."""
         self.kernel_type = kernel_type
         self.kernel_hyperparameters = kernel_hyperparameters
         self.kernel_hyperparameters_bounds = kernel_hyperparameters_bounds

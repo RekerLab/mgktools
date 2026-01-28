@@ -26,10 +26,7 @@ keywords = [
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "rdkit==2023.9.6", # new version print annoying warnings
-    "descriptastorus==2.6.1", # new version fail in pickle and multi-process acceleration
-    "numpy==1.26.4",
-    "mendeleev==0.19.0",
+    "descriptastorus", # new version fail in pickle and multi-process acceleration
     "typed-argument-parser",
     "scikit-learn",
     "rxntools",

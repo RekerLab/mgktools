@@ -5,7 +5,7 @@ from typing import Dict, List, Tuple, Optional
 import networkx as nx
 import pandas as pd
 import numpy as np
-from rdkit.Chem import rdMolDescriptors
+from rdkit.Chem import rdMolDescriptors, rdFingerprintGenerator
 from graphdot.graph._from_networkx import _from_networkx
 from rxntools.smiles import *
 from rxntools.substructure import FunctionalGroup, AtomEnvironment
@@ -240,12 +240,15 @@ class AtomBondFeaturesConfig:
             mol = Chem.AddHs(mol)
 
         if self.set_morgan_identifier:
-            # calculate morgan substrcutre hasing value
-            morgan_info = dict()
+            # calculate morgan substructure hashing value using new generator API
             atomidx_hash_dict = dict()
             radius = self.morgan_radius
-            Chem.GetMorganFingerprint(mol, radius, bitInfo=morgan_info,
-                                      useChirality=False)
+            generator = rdFingerprintGenerator.GetMorganGenerator(
+                radius=radius, includeChirality=False)
+            ao = rdFingerprintGenerator.AdditionalOutput()
+            ao.AllocateBitInfoMap()
+            generator.GetFingerprint(mol, additionalOutput=ao)
+            morgan_info = ao.GetBitInfoMap()
             while len(atomidx_hash_dict) != mol.GetNumAtoms():
                 for key in morgan_info.keys():
                     if morgan_info[key][0][1] != radius:

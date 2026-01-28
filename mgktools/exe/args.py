@@ -95,6 +95,9 @@ class KernelArgs(CommonArgs):
         if self.graph_kernel_type == "no" and self.features_generators_name is None:
             raise ValueError("At least one of graph kernel or features kernel should be used.")
 
+        if self.graph_hyperparameters is not None:
+            assert len(self.graph_hyperparameters) == len(self.smiles_columns), "--graph_hyperparameters should have the same length as --smiles_columns."
+
 
 class ModelArgs(Tap):
     model_type: Literal["gpr", "gpr-nystrom", "gpr-nle", "svr", "gpc", "svc"]
