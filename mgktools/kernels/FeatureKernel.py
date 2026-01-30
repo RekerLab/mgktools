@@ -29,31 +29,8 @@ class FeatureKernelConfig(BaseKernelConfig):
         assert len(self.microkernels_feature) == 1
         self.kernel = self.microkernels_feature[0].get_kernel()
 
-    def get_space(self) -> Dict:
-        """hyperopt function.
-
-        Returns:
-        --------
-        dict:
-            A dictionary for hyperparameters space used in hyperopt.
-        """
-        return self.combine_dicts(
-            [microkernel.get_space() for microkernel in self.microkernels_feature]
-        )
-
-    def update_from_space(self, space: Dict[str, Any]):
-        """hyperopt function. Update the hyperparameters from the space dictionary.
-
-        Parameters
-        ----------
-        space : dict
-            A dictionary with the hyperparameters values.
-        """
-        for microkernel in self.microkernels_feature:
-            microkernel.update_from_space(space)
-
     def get_trial(self, trial) -> Dict:
-        """optuna function.
+        """Get Optuna trial suggestions for all hyperparameters.
 
         Returns:
         --------
@@ -65,14 +42,15 @@ class FeatureKernelConfig(BaseKernelConfig):
         )
 
     def update_from_trial(self, trial: Dict[str, Any]):
-        """optuna function. Update the hyperparameters from the trial dictionary.
+        """Update the hyperparameters from the trial dictionary.
 
         Parameters
         ----------
         trial : dict
             A dictionary with the hyperparameters values.
         """
-        self.update_from_space(trial)
+        for microkernel in self.microkernels_feature:
+            microkernel.update_from_trial(trial)
 
     def update_from_theta(self):
         """gradient optimization function. Update the hyperparameters from kernel.theta."""

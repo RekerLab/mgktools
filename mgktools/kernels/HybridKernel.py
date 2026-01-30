@@ -195,22 +195,14 @@ class HybridKernelConfig(BaseKernelConfig):
             kernels.append(kernel_config.kernel)
         self.kernel = HybridKernel(kernels, self.composition, self.hybrid_rule)
 
-    def get_space(self):
-        return self.combine_dicts(
-            [kernel_config.get_space() for kernel_config in self.kernel_configs]
-        )
-
-    def update_from_space(self, space: Dict[str, Any]):
-        for kernel_config in self.kernel_configs:
-            kernel_config.update_from_space(space)
-
     def get_trial(self, trial) -> Dict:
         return self.combine_dicts(
             [kernel_config.get_trial(trial) for kernel_config in self.kernel_configs]
         )
-    
+
     def update_from_trial(self, trial: Dict[str, Any]):
-        self.update_from_space(trial)
+        for kernel_config in self.kernel_configs:
+            kernel_config.update_from_trial(trial)
 
     def update_from_theta(self):
         for kernel_config in self.kernel_configs:

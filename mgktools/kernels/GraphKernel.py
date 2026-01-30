@@ -162,36 +162,6 @@ class GraphKernelConfig(BaseKernelConfig):
         )
         self.kernel = self.microkernel_normalization.get_kernel()(kernel)
 
-    def get_space(self) -> Dict:
-        spaces = []
-        for mks in (
-            self.microkernels_atom
-            + self.microkernels_bond
-            + self.microkernels_probability
-        ):
-            for mk in mks:
-                spaces.append(mk.get_space())
-        spaces.append(self.microkernel_normalization.get_space())
-        spaces.append(self.microkernel_atype.get_space())
-        spaces.append(self.microkernel_btype.get_space())
-        spaces.append(self.microkernel_ptype.get_space())
-        spaces.append(self.microkernel_q.get_space())
-        return self.combine_dicts(spaces)
-
-    def update_from_space(self, space: Dict[str, Any]):
-        for mks in (
-            self.microkernels_atom
-            + self.microkernels_bond
-            + self.microkernels_probability
-        ):
-            for mk in mks:
-                mk.update_from_space(space)
-        self.microkernel_normalization.update_from_space(space)
-        self.microkernel_atype.update_from_space(space)
-        self.microkernel_btype.update_from_space(space)
-        self.microkernel_ptype.update_from_space(space)
-        self.microkernel_q.update_from_space(space)
-
     def get_trial(self, trial) -> Dict:
         trials = []
         for mks in (
@@ -209,7 +179,18 @@ class GraphKernelConfig(BaseKernelConfig):
         return self.combine_dicts(trials)
 
     def update_from_trial(self, trial: Dict[str, Any]):
-        self.update_from_space(trial)
+        for mks in (
+            self.microkernels_atom
+            + self.microkernels_bond
+            + self.microkernels_probability
+        ):
+            for mk in mks:
+                mk.update_from_trial(trial)
+        self.microkernel_normalization.update_from_trial(trial)
+        self.microkernel_atype.update_from_trial(trial)
+        self.microkernel_btype.update_from_trial(trial)
+        self.microkernel_ptype.update_from_trial(trial)
+        self.microkernel_q.update_from_trial(trial)
 
     def update_from_theta(self):
         """gradient optimization function. Update the hyperparameters from kernel.theta."""

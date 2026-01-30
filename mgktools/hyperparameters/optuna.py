@@ -88,7 +88,7 @@ def save_optimization_results(save_dir: str, best_params: Dict, kernel_config) -
             with open(f"{save_dir}/{param}", "w") as f:
                 f.write(str(best_params.pop(param)))
     
-    kernel_config.update_from_space(best_params)
+    kernel_config.update_from_trial(best_params)
     kernel_config.save(path=save_dir)
 
 

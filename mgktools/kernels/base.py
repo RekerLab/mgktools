@@ -5,7 +5,7 @@ Base kernel classes and microkernel components.
 
 This module provides the foundational classes for building complex kernels
 from smaller microkernel components. It supports hyperparameter optimization
-through both Hyperopt and Optuna frameworks.
+through Optuna and gradient-based methods.
 
 Classes
 -------
@@ -22,7 +22,6 @@ import os
 import pickle
 import numpy as np
 from sklearn.gaussian_process.kernels import DotProduct, RBF
-from hyperopt import hp
 from graphdot.microkernel import (
     Additive,
     Constant as Const,
@@ -93,7 +92,7 @@ class MicroKernel:
     >>> mk = MicroKernel(idx=0, name='length_scale', kernel_type='sExp',
     ...                  value=1.0, bounds=(0.1, 10.0))
     >>> kernel = mk.get_kernel()
-    >>> space = mk.get_space()  # For hyperparameter optimization
+    >>> trial_params = mk.get_trial(trial)  # For hyperparameter optimization
     """
 
     def __init__(
@@ -187,54 +186,6 @@ class MicroKernel:
         else:
             raise ValueError("Invalid kernel type %s." % self.kernel_type)
 
-    def get_space(self) -> Dict:
-        """
-        Get the Hyperopt search space for this microkernel.
-
-        Returns
-        -------
-        Dict
-            Dictionary mapping unique_name to Hyperopt distribution.
-            Empty dict if parameter is fixed.
-        """
-        if self.available_values is not None:
-            return {
-                self.unique_name: hp.choice(self.unique_name, self.available_values)
-            }
-        elif self.bounds == "fixed":
-            return {}
-        else:
-            if self.delta is None:
-                return {
-                    self.unique_name: hp.uniform(
-                        self.unique_name, low=self.bounds[0], high=self.bounds[1]
-                    )
-                }
-            else:
-                return {
-                    self.unique_name: hp.quniform(
-                        self.unique_name,
-                        low=self.bounds[0],
-                        high=self.bounds[1],
-                        q=self.delta,
-                    )
-                }
-
-    def update_from_space(self, space: Dict[str, Any]):
-        """
-        Update hyperparameter value from Hyperopt search space result.
-
-        Parameters
-        ----------
-        space : Dict[str, Any]
-            Dictionary of sampled hyperparameter values.
-        """
-        if self.unique_name in space:
-            assert self.bounds != "fixed"
-            self.value = space[self.unique_name]
-        else:
-            assert self.bounds == "fixed", f"{self.unique_name};{self.bounds};{space}"
-
     def get_trial(self, trial) -> Dict:
         """
         Get Optuna trial suggestions for this microkernel.
@@ -284,7 +235,11 @@ class MicroKernel:
         trial : Dict[str, Any]
             Dictionary of trial hyperparameter values.
         """
-        self.update_from_space(trial)
+        if self.unique_name in trial:
+            assert self.bounds != "fixed"
+            self.value = trial[self.unique_name]
+        else:
+            assert self.bounds == "fixed", f"{self.unique_name};{self.bounds};{trial}"
 
     def update_from_theta(self, values: List):
         """
@@ -373,23 +328,13 @@ class ABCKernelConfig(ABC):
     Abstract base class for kernel configurations.
 
     This class defines the interface that all kernel configurations must
-    implement to support hyperparameter optimization via Hyperopt, Optuna,
-    and gradient-based methods.
+    implement to support hyperparameter optimization via Optuna and
+    gradient-based methods.
     """
 
     @abstractmethod
     def update_kernel(self):
         """Update the kernel with current hyperparameter values."""
-        pass
-
-    @abstractmethod
-    def get_space(self) -> Dict:
-        """Get Hyperopt search space for all hyperparameters."""
-        pass
-
-    @abstractmethod
-    def update_from_space(self, space: Dict[str, Any]):
-        """Update hyperparameters from Hyperopt search space result."""
         pass
 
     @abstractmethod

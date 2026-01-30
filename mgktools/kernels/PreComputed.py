@@ -78,12 +78,6 @@ class PreComputedKernelConfig(BaseKernelConfig):
     def update_kernel(self):
         pass
 
-    def get_space(self) -> Dict:
-        return {}
-
-    def update_from_space(self, space: Dict[str, Any]):
-        pass
-
     def get_trial(self, trial) -> Dict:
         return {}
 
