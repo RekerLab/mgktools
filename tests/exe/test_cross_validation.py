@@ -3,6 +3,7 @@
 import pytest
 import os
 import shutil
+import tempfile
 import pandas as pd
 import numpy as np
 from mgktools.hyperparameters import (
@@ -72,7 +73,7 @@ def test_CrossValidation(input1, input2, features_scaling, input3, input4,
     features_generators, features_combination, n_features = input2
     model_type, model_params = input3
     cross_validation, n_splits, split, num_folds = input4
-    save_dir = f"{CWD}/tmp/cross_validation"
+    save_dir = tempfile.mkdtemp()
     if graph_hyperparameters is None:
         graph_kernel_type = "no"
     else:

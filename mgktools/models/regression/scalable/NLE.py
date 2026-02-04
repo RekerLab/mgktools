@@ -80,8 +80,14 @@ class NaiveLocalExpertGP:
             )
 
     def fit(self, X, y):
-        self.X = X
-        self.y = y
+        y_arr = np.asarray(y)
+        if y_arr.dtype == float:
+            valid_mask = ~np.isnan(y_arr)
+            self.X = np.asarray(X)[valid_mask]
+            self.y = y_arr[valid_mask]
+        else:
+            self.X = X
+            self.y = y
 
     def predict_(self, Z, return_std=False):
         Ks = self._gramian(Z, self.X)

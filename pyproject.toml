@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "mgktools"
 description = "Marginalized Graph Kernel Library for Molecular Property Prediction"
-version = "3.3.1"
+version = "3.4.0"
 authors = [
     {name = "Yan Xiang", email="yan.xiang@duke.edu"}
 ]

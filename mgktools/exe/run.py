@@ -179,7 +179,12 @@ def mgk_gradientopt(arguments=None):
         optimizer=args.optimizer,
         alpha=args.alpha_,
     )
-    model.fit(dataset.X, dataset.y, loss=args.loss, verbose=True)
+    if dataset.N_tasks > 1:
+        raise ValueError(
+            "Gradient optimization supports single-task datasets only. "
+            "Use Optuna (mgk_optuna) for multi-task."
+        )
+    model.fit(dataset.X, dataset.y[:, 0], loss=args.loss, verbose=True)
     kernel_config.update_from_theta()
     kernel_config.update_kernel()
     kernel_config.save(args.save_dir)

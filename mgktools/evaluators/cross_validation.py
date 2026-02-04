@@ -176,7 +176,8 @@ class Evaluator:
             df_metrics.to_csv("%s/kFold_metrics.csv" % self.save_dir, index=False)
             self.log("kFold cross-validation performance:")
             self.log_metrics(df_metrics)
-            return df_metrics['value'].mean()
+            df_primary = df_metrics[df_metrics["metric"] == self.metrics[0]]
+            return self._weighted_mean(df_primary)
         elif self.cross_validation == "Monte-Carlo":
             assert self.split_type is not None, "split_type must be specified for Monte-Carlo cross-validation."
             assert self.split_sizes is not None, "split_sizes must be specified for Monte-Carlo cross-validation."
@@ -205,7 +206,8 @@ class Evaluator:
             df_metrics.to_csv("%s/Monte-Carlo_metrics.csv" % self.save_dir, index=False)
             self.log("Monte-Carlo cross-validation performance:")
             self.log_metrics(df_metrics)
-            return df_metrics['value'].mean()
+            df_primary = df_metrics[df_metrics["metric"] == self.metrics[0]]
+            return self._weighted_mean(df_primary)
         elif self.cross_validation == "no":
             raise ValueError("When set cross_validation to 'no', please use run_external() not eval_cross_validation.")
         else:
@@ -240,7 +242,8 @@ class Evaluator:
                                    "contribution_percentage": c_percentage[i][idx],
                                    "contribution_value": c_y[i][idx]})
                 df.to_csv("%s/molecular_attribution_mol%d.csv" % (self.save_dir, i), index=False)
-        return df_metrics['value'].mean()
+        df_primary = df_metrics[df_metrics["metric"] == self.metrics[0]]
+        return self._weighted_mean(df_primary)
 
     def eval_loocv(self) -> float:
         df_predict, df_metrics = self.evaluate_train_test(self.dataset, self.dataset)
@@ -249,7 +252,8 @@ class Evaluator:
         # Calculate metrics values.
         self.log("Leave-one-out cross-validation performance:")
         self.log_metrics(df_metrics)
-        return df_metrics['value'].mean()
+        df_primary = df_metrics[df_metrics["metric"] == self.metrics[0]]
+        return self._weighted_mean(df_primary)
 
     def evaluate_train_test(self, dataset_train: Dataset,
                             dataset_test: Dataset, loocv=True) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -258,7 +262,18 @@ class Evaluator:
         y_preds = []
         for i in range(dataset_train.N_tasks):
             if self.cross_validation == "leave-one-out" and loocv:
-                y_pred, y_std = self.model.predict_loocv(dataset_test.X, dataset_test.y[:, i], return_std=True)
+                y_task = np.asarray(dataset_test.y[:, i], dtype=float)
+                valid_mask = ~np.isnan(y_task)
+                y_pred_valid, y_std_valid = self.model.predict_loocv(
+                    dataset_test.X, y_task, return_std=True
+                )
+                if valid_mask.sum() < len(y_task):
+                    y_pred = np.full(len(y_task), np.nan)
+                    y_std = np.full(len(y_task), np.nan)
+                    y_pred[valid_mask] = y_pred_valid
+                    y_std[valid_mask] = y_std_valid
+                else:
+                    y_pred, y_std = y_pred_valid, y_std_valid
             else:
                 self.fit(dataset_train.X, dataset_train.y[:, i])
                 if self.task_type == "regression":
@@ -287,9 +302,19 @@ class Evaluator:
             metrics_data = []
             for metric in self.metrics:
                 for i in range(dataset_train.N_tasks):
-                    v = self.eval_metric(dataset_test.y[:, i], y_preds[i], metric)
-                    metrics_data.append([metric, i, v])
-            df_metrics = pd.DataFrame(metrics_data, columns=["metric", "no_targets_columns", "value"])
+                    y_true_i = np.asarray(dataset_test.y[:, i], dtype=float)
+                    y_pred_i = np.asarray(y_preds[i], dtype=float)
+                    valid_mask = ~np.isnan(y_true_i)
+                    n_valid = int(valid_mask.sum())
+                    if n_valid > 0:
+                        v = self.eval_metric(y_true_i[valid_mask], y_pred_i[valid_mask], metric)
+                    else:
+                        v = np.nan
+                    metrics_data.append([metric, i, v, n_valid])
+            df_metrics = pd.DataFrame(
+                metrics_data,
+                columns=["metric", "no_targets_columns", "value", "n_samples"]
+            )
             return df_predict, df_metrics
         else:
             return df_predict, None
@@ -368,6 +393,15 @@ class Evaluator:
             raise NotImplementedError("multi-class classification is not supported yet.")
             # return metric_multiclass(y, y_pred, metric)
 
+    @staticmethod
+    def _weighted_mean(df_metrics: pd.DataFrame) -> float:
+        if 'n_samples' not in df_metrics.columns:
+            return df_metrics['value'].mean()
+        valid = df_metrics.dropna(subset=['value'])
+        if len(valid) == 0 or valid['n_samples'].sum() == 0:
+            return np.nan
+        return (valid['value'] * valid['n_samples']).sum() / valid['n_samples'].sum()
+
     def log_metrics(self, df_metrics: pd.DataFrame):
         N_targets_columns = df_metrics["no_targets_columns"].max() + 1
         for metric in self.metrics:
@@ -376,14 +410,16 @@ class Evaluator:
             if len(df_) == 1:
                 self.log(f"Metric({metric}): %.5f" % df_["value"].iloc[0])
             else:
-                self.log(f"Metric({metric}): %.5f +/- %.5f" % (df_["value"].mean(), df_["value"].std()))
+                mean_val = self._weighted_mean(df_)
+                self.log(f"Metric({metric}): %.5f +/- %.5f" % (mean_val, df_["value"].std()))
         for i in range(N_targets_columns):
             df_ = df_metrics[df_metrics["no_targets_columns"] == i]
             assert len(df_) > 0
             if len(df_) == 1:
                 self.log(f"Target({i}): %.5f" % df_["value"].iloc[0])
             else:
-                self.log(f"Target({i}): %.5f +/- %.5f" % (df_["value"].mean(), df_["value"].std()))
+                mean_val = self._weighted_mean(df_)
+                self.log(f"Target({i}): %.5f +/- %.5f" % (mean_val, df_["value"].std()))
         for i in range(N_targets_columns):
             for metric in self.metrics:
                 df_ = df_metrics[(df_metrics["metric"] == metric) & (df_metrics["no_targets_columns"] == i)]
@@ -391,7 +427,8 @@ class Evaluator:
                 if len(df_) == 1:
                     self.log(f"Target({i}),Metric({metric}): %.5f" % df_["value"].iloc[0])
                 else:
-                    self.log(f"Target({i}),Metric({metric}): %.5f +/- %.5f" % (df_["value"].mean(), df_["value"].std()))
+                    mean_val = self._weighted_mean(df_)
+                    self.log(f"Target({i}),Metric({metric}): %.5f +/- %.5f" % (mean_val, df_["value"].std()))
 
     def log(self, info: str):
         if self.verbose:

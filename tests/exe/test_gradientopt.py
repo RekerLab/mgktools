@@ -3,6 +3,7 @@
 import pytest
 import os
 import shutil
+import tempfile
 import pandas as pd
 from mgktools.hyperparameters import (
     additive, additive_pnorm, additive_msnorm, additive_norm,
@@ -49,7 +50,7 @@ def test_GradientOpt(input1, input2, features_scaling,
                      loss, optimizer):
     dataset, smiles_columns, targets_columns, features_columns, task_type = input1
     features_generators, features_combination, n_features = input2
-    save_dir = f"{CWD}/tmp/gradientopt"
+    save_dir = tempfile.mkdtemp()
     graph_kernel_type = "graph" if graph_hyperparameters is not None else "no"
     ### skip the invalid input combinations
     if graph_kernel_type == 'no' and features_generators is None:

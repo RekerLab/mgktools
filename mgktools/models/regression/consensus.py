@@ -63,12 +63,23 @@ class EnsembleRegressor:
         assert (n_estimators > 0)
 
     def fit(self, X, y):
+        y = np.asarray(y)
+        if y.dtype == float:
+            valid_mask = ~np.isnan(y)
+        else:
+            valid_mask = np.ones(len(y), dtype=bool)
+        X_valid = np.asarray(X)[valid_mask]
+        y_valid = y[valid_mask]
+        n_samples = min(self.n_samples_per_model, len(X_valid))
+        original_n_samples = self.n_samples_per_model
+        self.n_samples_per_model = n_samples
         models = [copy.deepcopy(self.model) for i in range(self.n_estimators)]
         models = Parallel(n_jobs=self.n_jobs, verbose=self.verbose, prefer='processes')(
             delayed(_parallel_build_models)(
-                m, self, X, y, i, len(models), verbose=self.verbose)
+                m, self, X_valid, y_valid, i, len(models), verbose=self.verbose)
             for i, m in enumerate(models))
         self.models.extend(models)
+        self.n_samples_per_model = original_n_samples
 
     def predict(self, X, return_std=False, return_cov=False):
         assert (not return_cov)

@@ -3,7 +3,7 @@ from mgktools.models.regression.gpr.gpr import GaussianProcessRegressor
 from graphdot.model.gaussian_process.nystrom import LowRankApproximateGPR
 from mgktools.models.regression.scalable.NLE import NaiveLocalExpertGP
 from mgktools.models.regression.consensus import EnsembleRegressor
-from sklearn.svm import SVR
+from mgktools.models.regression.svr import SVRegressor
 from mgktools.models.classification.gpc.gpc import GaussianProcessClassifier
 from mgktools.models.classification.svm.svm import SVMClassifier
 
@@ -56,7 +56,7 @@ def set_model(model_type: Literal['gpr', 'gpr-nystrom', 'gpr-nle', 'svr', 'gpc',
         )
     elif model_type == 'svr':
         assert C is not None
-        model = SVR(kernel=kernel, C=C)
+        model = SVRegressor(kernel=kernel, C=C)
     elif model_type == 'gpc':
         model = GaussianProcessClassifier(
             kernel=kernel,

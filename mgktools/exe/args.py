@@ -47,7 +47,7 @@ class CommonArgs(Tap):
     """
     targets_columns: List[str] = None
     """
-    Name of the columns containing target values. Multi-targets are not implemented yet.
+    Name of the columns containing target values. Multiple target columns are supported for multi-task learning.
     """
     features_generators_name: List[str] = None
     """Method(s) of generating additional features_mol."""

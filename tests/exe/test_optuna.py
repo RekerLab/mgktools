@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import pytest
 import os
+import tempfile
 import pandas as pd
 from mgktools.hyperparameters import (
     additive, additive_pnorm, additive_msnorm, additive_norm,
@@ -70,7 +71,7 @@ def test_Optuna(input1, input2, features_scaling, input3, input4,
     model_type, model_params = input3
     cross_validation, n_splits, split, num_folds = input4
     graph_kernel_type = 'graph' if graph_hyperparameters is not None else 'no'
-    save_dir = f"{CWD}/tmp/optuna"
+    save_dir = tempfile.mkdtemp()
     ### skip the invalid input combinations
     if task_type == "regression":
         # Skip regression datasets for gpc and svc
@@ -191,7 +192,7 @@ def test_OptunaMultiDatasets(input1, input2, features_scaling, graph_hyperparame
         # You must use graph kernel or feature kernel.
         return
     # hyperparameters optimization using Optuna
-    save_dir = f"{CWD}/tmp/multi"
+    save_dir = tempfile.mkdtemp()
     arguments = [
         "--save_dir", save_dir,
         "--data_paths"] + data_paths + [
